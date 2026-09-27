@@ -72,7 +72,7 @@ OPENCLAWCASH_AGENT_KEY=occ_your_api_key
 
 ## Scope
 
-Core wallet management only. Not yet covered: swap, bridge, Get Paid checkout, Polymarket, and YieldWolf
+Core wallet management only. Not yet covered: swap, bridge, Escrow (formerly Get Paid) checkout, Polymarket, and YieldWolf
 Casino tools. Adding one follows the same pattern — a schema in `agentwalletapi/schemas.py`, a thin handler
 in `agentwalletapi/tools.py`, and one `register_tool` line in `agentwalletapi/__init__.py`.
 
