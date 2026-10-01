@@ -12,7 +12,9 @@ by walletId, not walletLabel.
 
 from __future__ import annotations
 
-from typing import Any
+import functools
+import json
+from typing import Any, Callable
 
 from .api_client import AgentWalletApiError, call_agent_api
 
@@ -34,6 +36,23 @@ def _error_result(err: AgentWalletApiError) -> dict[str, Any]:
     return {"ok": False, "error": str(err), "status": err.status, "details": err.body}
 
 
+def _json_result(func: Callable[[dict[str, Any]], dict[str, Any]]) -> Callable[..., str]:
+    """Return the handler's result as a JSON string, as Hermes requires.
+
+    Hermes treats any non-str tool result as an error, so returning a dict
+    made a successful transfer look like a failure to the model (and a retry
+    would send the funds again). Hermes also passes extra keyword arguments
+    (e.g. task_id), which are accepted and ignored here.
+    """
+
+    @functools.wraps(func)
+    def wrapper(arguments: dict[str, Any] | None = None, **_kwargs: Any) -> str:
+        return json.dumps(func(arguments or {}), default=str)
+
+    return wrapper
+
+
+@_json_result
 def agentwalletapi_wallets_list(arguments: dict[str, Any]) -> dict[str, Any]:
     query = {}
     if arguments.get("includeBalances"):
@@ -44,6 +63,7 @@ def agentwalletapi_wallets_list(arguments: dict[str, Any]) -> dict[str, Any]:
         return _error_result(err)
 
 
+@_json_result
 def agentwalletapi_wallet_get(arguments: dict[str, Any]) -> dict[str, Any]:
     query = {**_selector(arguments)}
     if arguments.get("chain") is not None:
@@ -54,6 +74,7 @@ def agentwalletapi_wallet_get(arguments: dict[str, Any]) -> dict[str, Any]:
         return _error_result(err)
 
 
+@_json_result
 def agentwalletapi_wallet_rename(arguments: dict[str, Any]) -> dict[str, Any]:
     label = arguments.get("label")
     if not isinstance(label, str) or not label.strip():
@@ -68,6 +89,7 @@ def agentwalletapi_wallet_rename(arguments: dict[str, Any]) -> dict[str, Any]:
         return _error_result(err)
 
 
+@_json_result
 def agentwalletapi_wallet_create(arguments: dict[str, Any]) -> dict[str, Any]:
     required = ("label", "exportPassphrase", "exportPassphraseStorageType", "exportPassphraseStorageRef")
     missing = [k for k in required if not arguments.get(k)]
@@ -93,6 +115,7 @@ def agentwalletapi_wallet_create(arguments: dict[str, Any]) -> dict[str, Any]:
         return _error_result(err)
 
 
+@_json_result
 def agentwalletapi_wallet_import(arguments: dict[str, Any]) -> dict[str, Any]:
     required = ("label", "network", "privateKey")
     missing = [k for k in required if not arguments.get(k)]
@@ -105,6 +128,7 @@ def agentwalletapi_wallet_import(arguments: dict[str, Any]) -> dict[str, Any]:
         return _error_result(err)
 
 
+@_json_result
 def agentwalletapi_transfer_send(arguments: dict[str, Any]) -> dict[str, Any]:
     to = arguments.get("to")
     if not to:
