@@ -13,11 +13,25 @@ import json
 import os
 import re
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 DEFAULT_BASE_URL = "https://openclawcash.com"
 _HOST_PATTERN = re.compile(r"^openclawcash\.com$|^[a-z0-9-]+\.openclawcash\.com$")
 _TIMEOUT_SECONDS = 30
+# Cloudflare in front of openclawcash.com rejects urllib's default
+# "Python-urllib/x.y" User-Agent with 403 (error 1010), so send our own.
+_USER_AGENT = "agentwalletapi-hermes"
+
+
+class _NoRedirect(HTTPRedirectHandler):
+    """Refuse every redirect: the agent API never redirects, and following one
+    would resend X-Agent-Key to whatever host the Location header names."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+_opener = build_opener(_NoRedirect)
 
 
 class AgentWalletApiError(Exception):
@@ -75,13 +89,13 @@ def call_agent_api(method: str, path: str, *, query: dict | None = None, body: d
             url = f"{url}?{urlencode(clean)}"
 
     data = json.dumps(body).encode("utf-8") if body is not None else None
-    headers = {"Accept": "application/json", "X-Agent-Key": agent_key}
+    headers = {"Accept": "application/json", "User-Agent": _USER_AGENT, "X-Agent-Key": agent_key}
     if data is not None:
         headers["Content-Type"] = "application/json"
 
     request = Request(url, data=data, headers=headers, method=method)
     try:
-        with urlopen(request, timeout=_TIMEOUT_SECONDS) as response:
+        with _opener.open(request, timeout=_TIMEOUT_SECONDS) as response:
             payload = json.loads(response.read().decode("utf-8") or "{}")
             return payload
     except HTTPError as err:

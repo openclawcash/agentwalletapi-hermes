@@ -42,13 +42,16 @@ OPENCLAWCASH_AGENT_KEY=occ_your_api_key
 | `agentwalletapi_wallets_list` | List the managed wallets available to the configured agent key. Optional `includeBalances`. |
 | `agentwalletapi_wallet_get` | Fetch one wallet with native and token balances. |
 | `agentwalletapi_wallet_rename` | Update a wallet's label. Metadata only — no funds move. |
-| `agentwalletapi_wallet_create` | Create a new managed wallet. Requires an export passphrase you have stored yourself plus an explicit confirmation that it is saved. |
-| `agentwalletapi_wallet_import` | Import an existing wallet from a private key. |
+| `agentwalletapi_wallet_create` | Create a new managed wallet. Its export passphrase is read from `OPENCLAWCASH_EXPORT_PASSPHRASE`, never from the model. |
 | `agentwalletapi_transfer_send` | Send a native asset or token transfer from a managed wallet. |
 
-`wallet_get`, `wallet_rename`, and `transfer_send` select the wallet with exactly one of `walletId`,
-`walletLabel`, or `walletAddress` (`walletId` preferred). Networks: `sepolia`, `mainnet`,
+`wallet_get` selects the wallet with exactly one of `walletId`, `walletLabel`, or `walletAddress`.
+`wallet_rename` and `transfer_send` accept `walletId` only. Networks: `sepolia`, `mainnet`,
 `polygon-mainnet`, `base-mainnet`, `solana-devnet`, `solana-testnet`, `solana-mainnet`.
+
+Importing an existing wallet by private key is deliberately not a tool: a key passed as a tool argument
+would sit in the model context, reach the LLM provider, and be stored in the session transcript. Import
+from the OpenClawCash dashboard ("Import Existing Wallet") or the OpenClawCash CLI instead.
 
 ## Configuration
 
@@ -56,19 +59,24 @@ OPENCLAWCASH_AGENT_KEY=occ_your_api_key
 |---|---|---|---|
 | `OPENCLAWCASH_AGENT_KEY` | `AGENTWALLETAPI_KEY` | — | Authenticates every request (sent as `X-Agent-Key`). |
 | `OPENCLAWCASH_BASE_URL` | `AGENTWALLETAPI_URL` | `https://openclawcash.com` | API host. |
+| `OPENCLAWCASH_EXPORT_PASSPHRASE` | — | — | Export passphrase (12+ characters) for wallets made with `wallet_create`. Only needed for that tool. Keep a copy somewhere safe: you need it to export a wallet's key. |
 
 ## Security
 
 - **Host allowlist.** The base URL is read from the environment, so a tampered value could redirect the
   agent key to an attacker-controlled host. Only `https://openclawcash.com` or
   `https://<subdomain>.openclawcash.com` is accepted — no port, path, or embedded credentials — and any
-  other value is refused before a request is made.
+  other value is refused before a request is made. Redirects are refused, so the key cannot follow one
+  to another host.
 - **Key handling.** The agent key travels only in the `X-Agent-Key` header to that allowlisted host. It is
   never logged and never returned in tool output.
-- **Write tools expect approval.** `wallet_create`, `wallet_import`, and `transfer_send` are declared
+- **No secrets in tool arguments.** The export passphrase comes from the environment and private-key import
+  is not exposed, so no secret enters the model context or the transcript.
+- **Write tools expect approval.** `wallet_create` and `transfer_send` are declared
   high-risk and are meant to run under Hermes session approval mode.
 - **Labels are data, not instructions.** Wallet labels are user-controlled text; they are returned as data
-  and never interpreted as instructions, and write actions select wallets by `walletId`.
+  and never interpreted as instructions. `wallet_rename` and `transfer_send` accept only `walletId` and reject a
+  label or address.
 
 ## Scope
 
