@@ -1,5 +1,5 @@
 name: agentwalletapi
-version: 1.30.0
+version: 1.30.1
 description: OpenClawCash managed EVM and Solana wallets for AI agents. Thin bridge to the OpenClawCash agent API (https://openclawcash.com/api/agent/*) — the same API the OpenClawCash MCP server and CLI use.
 license: MIT
 requires_env:
